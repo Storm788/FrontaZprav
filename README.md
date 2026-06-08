@@ -113,3 +113,4 @@ I přes špičkové vlastnosti má gRPC specifická úskalí:
 * **Režie se správou kontraktů:** Každá strukturální změna v rozhraní vyžaduje distribuci nových kontraktů (přegenerování kódu nebo aktualizaci NuGet balíčku) a striktní dodržování pravidel zpětné kompatibility.
 * **Nevhodné pro veřejná API:** Pro otevřená API určená široké veřejnosti nebo třetím stranám zůstává kvůli snadné integraci a univerzálnosti standardem REST API (JSON).
 
+https://www.postman.com/devrel/grpc-vs-rest/grpc-request/67ebfe40f0b1294ed3714b31?sideView=agentMode
