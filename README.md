@@ -19,7 +19,7 @@ HTTP/2 přineslo revoluci v síťové komunikaci, ze které gRPC plně těží:
 
 ### 2. Multiplatformní a úsporný Protobuf
 
-**Protocol Buffers (Protobuf)** představují jazykově neutrální mechanismus pro binární serializaci dat. Namísto ukecaného formátu JSON nebo XML se data komprimují do minimálního binárního streamu. Bohatá nabídka nástrojů umožňuje ze společné specifikace generovat klientské knihovny (Stuby) i dokumentaci pro libovolný programovací jazyk.
+**Protocol Buffers (Protobuf)** představují jazykově neutrální mechanismus pro binární serializaci dat. Namísto formátu JSON nebo XML se data komprimují do minimálního binárního streamu. Bohatá nabídka nástrojů umožňuje ze společné specifikace generovat klientské knihovny i dokumentaci pro libovolný programovací jazyk.
 
 ---
 
@@ -29,10 +29,7 @@ HTTP/2 přineslo revoluci v síťové komunikaci, ze které gRPC plně těží:
 | --- | --- | --- |
 | **Protokol** | HTTP/2 (striktně vyžadováno) | HTTP/1.1 nebo HTTP/2 |
 | **Datový formát** | Protobuf (binární, úsporný) | JSON, XML (textový, lidsky čitelný) |
-| **Typovost** | Silná, definovaná kontraktem | Volná (závislá na OpenAPI/Swaggeru) |
-| **Styl návrhu** | Procedurální (RPC - Volání funkcí) | Datově orientovaný (CRUD nad zdroji) |
 | **Komunikační model** | Unary, Client/Server/Obousměrný stream | Request-Response (případně SSE/WebSockets) |
-| **Generování kódu** | Nativní a integrované | Vyžaduje nástroje třetích stran |
 
 ---
 
@@ -116,8 +113,3 @@ I přes špičkové vlastnosti má gRPC specifická úskalí:
 * **Režie se správou kontraktů:** Každá strukturální změna v rozhraní vyžaduje distribuci nových kontraktů (přegenerování kódu nebo aktualizaci NuGet balíčku) a striktní dodržování pravidel zpětné kompatibility.
 * **Nevhodné pro veřejná API:** Pro otevřená API určená široké veřejnosti nebo třetím stranám zůstává kvůli snadné integraci a univerzálnosti standardem REST API (JSON).
 
----
-
-## Závěr
-
-gRPC představuje robustní, stabilní a technologicky vyspělý framework. Pokud budujete distribuovaný systém, přecházíte ze starého WCF, nebo vyvíjíte moderní webovou aplikaci v Blazoru, nabízí vám gRPC výkon a typovou bezpečnost, které posunou efektivitu celého systému na novou úroveň.
