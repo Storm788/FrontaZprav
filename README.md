@@ -1,116 +1,265 @@
-# gRPC: Moderní a efektivní komunikace mezi mikroslužbami
+# Fronty zpráv s RabbitMQ
 
-**gRPC (gRPC Remote Procedure Call)** je vysoce výkonný, open-source framework vyvinutý společností Google a uvolněný v březnu 2015. Za více než deset let své existence se stal časem prověřenou technologií, kterou pro svou interní komunikaci adoptovali technologičtí giganti jako **Netflix** nebo **Spotify**.
-
-Kolem gRPC vznikla masivní komunita a dnes se jedná o standard s podporou prakticky všech myslitelných platforem. gRPC služby jsou orientované **procedurálně**, což z nich dělá ideální volbu pro vývojáře, kterým nevyhovuje architektonický styl REST API. V prostředí **.NET** se gRPC ustálilo jako přímý myšlenkový nástupce dříve populárního, ale již zastaralého frameworku **WCF (Windows Communication Foundation)**.
-
----
-
-## Architektura a efektivní komunikace
-
-Maximální výkonnost gRPC je zajištěna synergickým spojením dvou klíčových technologií: **protokolu HTTP/2** a **binární serializace Protobuf**.
-
-### 1. Protokol HTTP/2 jako základní pilíř
-
-HTTP/2 přineslo revoluci v síťové komunikaci, ze které gRPC plně těží:
-
-* **Framing (Rámování):** Komunikace je rozdělena na malé, samostatné binární rámce, což eliminuje textový režim starších protokolů.
-* **Multiplexing:** Na jednom jediném TCP spojení lze otevřít stovky paralelních streamů mezi klientem a serverem. Data tak mohou proudit kontinuálně oběma směry bez nutnosti režie na neustálé otevírání nových spojení.
-
-### 2. Multiplatformní a úsporný Protobuf
-
-**Protocol Buffers (Protobuf)** představují jazykově neutrální mechanismus pro binární serializaci dat. Namísto formátu JSON nebo XML se data komprimují do minimálního binárního streamu. Bohatá nabídka nástrojů umožňuje ze společné specifikace generovat klientské knihovny i dokumentaci pro libovolný programovací jazyk.
+**Předmět:** Analýza IS – NoSQL / Big Data  
+**Délka:** přibližně 10–12 minut  
+**Autor:** Kryštof Pavlů, Daniel Borovička 
 
 ---
 
-## Srovnání: gRPC vs. REST API
+## Snímek 1 – Fronty zpráv s RabbitMQ
 
-| Vlastnost | gRPC | REST API |
-| --- | --- | --- |
-| **Protokol** | HTTP/2 (striktně vyžadováno) | HTTP/1.1 nebo HTTP/2 |
-| **Datový formát** | Protobuf (binární, úsporný) | JSON, XML (textový, lidsky čitelný) |
-| **Komunikační model** | Unary, Client/Server/Obousměrný stream | Request-Response (případně SSE/WebSockets) |
+**Fronty zpráv s RabbitMQ**
 
----
+Jak oddělit služby, zvládnout špičky a neztratit rozpracovanou úlohu
 
-## Podpora komunikačních modelů (Streaming)
+`Producent → broker → konzument`
 
-Díky plně duplexnímu streamování v HTTP/2 podporuje gRPC čtyři základní scénáře, které lze efektivně využít pro synchronní komunikaci v mikroslužbách, dávkové operace i přenosy v reálném čase:
 
-* **Unary (Požadavek/Odpověď):** Klasický model, kdy klient pošle jeden požadavek a čeká na jednu odpověď.
-* **Server-streaming:** Klient pošle jeden požadavek a server kontinuálně posílá proud dat (např. continuous feed, sledování logů).
-* **Client-streaming:** Klient posílá proud dat na server, který po zpracování vrátí jednu finální odpověď (např. nahrávání velkého souboru po částech).
-* **Bidirectional (Obousměrné) streaming:** Obě strany posílají data nezávisle na sobě v reálném čase. Ideální pro **kontinuální čtení dat ze senzorů (IoT), notifikační huby nebo chatovací aplikace**.
+Dnes budu mluvit o frontách zpráv a systému RabbitMQ. Hlavní princip je jednoduchý: aplikace, která vytvoří nějaký úkol, nemusí čekat, až ho jiná aplikace dokončí. Úkol předá prostředníkovi, kterému říkáme broker, a může pokračovat dál. RabbitMQ se postará o uložení a předání úkolu správnému příjemci.
+
+Příkladem může být e-shop. Po vytvoření objednávky je potřeba poslat e-mail, rezervovat zboží nebo zapsat údaje do analytiky. Tyto činnosti nemusí proběhnout všechny ve stejné sekundě.
+
+**Zapamatuj si:** RabbitMQ je prostředník mezi aplikací, která úkol vytvoří, a aplikací, která ho zpracuje.
 
 ---
 
-## Návrh gRPC služeb a podpora v .NET
+## Snímek 2 – Jeden pomalý krok může zablokovat celou objednávku
 
-Podpora gRPC sahá v ekosystému Microsoftu až do tradičního .NET Frameworku, avšak skutečně nativní, snadné a vysoce optimalizované použití přinesl až **.NET Core 3.1** a novější verze (.NET 6/8/9). Skvělou zprávou pro enterprise vývojáře je, že gRPC se rozvíjí stabilně a pomalu – není třeba se obávat neustálých breaking changes a zpětně nekompatibilních změn.
+**Synchronní řetězec:**
 
-V .NET prostředí existují dva hlavní přístupy k návrhu:
+`Web → Platba → Sklad → E-mail → Výsledek`
 
-### A. Contract-First (Přístup přes `.proto` soubory)
+- Web přijme objednávku.
+- Platební služba čeká na bránu.
+- Sklad rezervuje zboží.
+- E-mailová služba posílá potvrzení.
+- Uživatel stále čeká.
 
-Standardní cesta, kdy se nejprve definuje rozhraní v neutrálním jazyce Protobuf:
+Pokud e-mail nebo sklad vypadne, chyba se může přenést až k uživateli, i když samotná objednávka už vznikla.
 
-```protobuf
-syntax = "proto3";
-package greeter;
+Nejdřív si ukážeme problém. Uživatel odešle objednávku a web začne postupně volat další služby. Čeká na platbu, sklad a nakonec na odeslání e-mailu. Tomu říkáme synchronní komunikace, protože jedna část čeká na odpověď druhé.
 
-service Greeter {
-  rpc SayHello (HelloRequest) returns (HelloReply);
-}
+Když je například e-mailová služba pomalá, čeká kvůli ní celý požadavek. Pokud úplně spadne, může uživatel dostat chybu, i když objednávka už byla správně vytvořena. Odeslání potvrzovacího e-mailu přitom může klidně proběhnout o několik sekund později.
 
-message HelloRequest {
-  string name = 1;
-}
+**Jednoduché přirovnání:** Jeden člověk nosí dokument postupně přes několik kanceláří a v každé čeká na razítko.
 
-message HelloReply {
-  string message = 1;
-}
+---
 
+## Snímek 3 – Fronta umožní bezpečně předat úkol
+
+| Bez fronty | S frontou |
+|---|---|
+| Web volá e-mailovou službu přímo. | Web předá zprávu brokeru. |
+| Obě služby musí současně fungovat. | Konzument může pracovat vlastním tempem. |
+| Web čeká na dokončení. | Web nemusí čekat na dokončení. |
+| Špička okamžitě zatíží příjemce. | Zprávy se dočasně seřadí ve frontě. |
+| Chyba příjemce se vrátí webu. | Nedokončenou zprávu lze doručit znovu. |
+
+**Asynchronní neznamená okamžité. Znamená, že odesílatel nemusí čekat na výsledek.**
+
+Fronta vloží mezi web a e-mailovou službu prostředníka. Web už neposílá úkol přímo e-mailové službě. Vytvoří zprávu, například „pošli potvrzení objednávky“, a předá ji RabbitMQ.
+
+RabbitMQ zprávu podrží. E-mailová služba si ji vezme, až bude mít kapacitu. Web díky tomu nemusí čekat na samotné odeslání e-mailu. Stačí mu vědět, že úkol byl přijat.
+
+Fronta pomáhá také při krátkodobé špičce. Když přijde tisíc objednávek najednou, e-mailová služba je nemusí zpracovat ve stejné sekundě. Zprávy čekají ve frontě a zpracují se postupně.
+
+**Pozor:** Uživatel rychle dostane informaci, že úkol byl přijat. To ale ještě nemusí znamenat, že byl dokončen.
+
+---
+
+## Snímek 4 – Jak zpráva prochází RabbitMQ
+
+
+`PRODUCENT → EXCHANGE → FRONTA → KONZUMENT → ACK`
+
+- **Producent** vytvoří zprávu.
+- **Exchange** rozhodne, kam zpráva půjde.
+- **Fronta** zprávu dočasně drží.
+- **Konzument** zprávu převezme a zpracuje.
+- **ACK** potvrzuje úspěšné dokončení.
+
+Jednu zprávu z jedné pracovní fronty zpracuje jeden konzument.
+
+
+Producent je aplikace, která zprávu vytváří. Může to být například web e-shopu. Zprávu neodesílá přímo konzumentovi, ale publikuje ji do exchange.
+
+Exchange si můžeme představit jako poštovní třídírnu. Podle pravidel a hodnoty zvané routing key rozhodne, do které fronty zpráva patří. Fronta je jako přihrádka, ve které zpráva čeká.
+
+Konzument je pracovník nebo aplikace, která zprávu vezme a provede požadovanou práci. Po úspěšném dokončení odešle potvrzení ACK. Teprve potom broker ví, že zprávu může odstranit.
+
+**Přirovnání k restauraci:** Číšník je producent, objednávkový lístek je zpráva, lišta s lístky je fronta, kuchař je konzument a označení „hotovo“ je ACK.
+
+---
+
+## Snímek 5 – Jedna objednávka může spustit více úloh
+
+**Událost: objednávka byla vytvořena**
+
+- Sklad rezervuje zboží.
+- E-mailová služba pošle potvrzení.
+- Analytika zapíše událost do reportingu.
+
+Každá služba má vlastní frontu a může fungovat nezávisle.
+
+Jedna událost může zajímat více služeb. Když vznikne objednávka, sklad musí rezervovat zboží, e-mailová služba musí poslat potvrzení a analytická služba chce událost zapsat do reportu.
+
+Exchange může stejnou událost nasměrovat do několika samostatných front. Každá služba tak dostane vlastní kopii zprávy. Pokud analytika hodinu nefunguje, neměla by kvůli tomu přestat fungovat rezervace zboží ani posílání e-mailů. Po restartu si analytika čekající zprávy postupně zpracuje.
+
+Tomuto způsobu distribuce se říká publish/subscribe. Jeden producent publikuje událost a více odběratelů o ni může mít zájem.
+
+**Pozor:** Pokud mají tři různé služby dostat stejnou událost, obvykle potřebují tři samostatné fronty napojené na exchange.
+
+---
+
+## Snímek 6 – Minimální architektura
+
+`Python producer → RabbitMQ broker → Python consumer`
+
+- **Producer:** Python a knihovna `pika`; publikuje zprávu.
+- **RabbitMQ:** broker; port `5672` pro AMQP a `15672` pro administrační rozhraní.
+- **Consumer:** Python a knihovna `pika`; zprávu zpracuje a potvrdí.
+- Vše může spouštět Docker Compose na společné síti.
+- RabbitMQ může používat perzistentní volume.
+
+Nejjednodušší praktická architektura má tři části. První je producent napsaný v Pythonu. Ten vytváří zprávy. Uprostřed běží RabbitMQ a na druhé straně je konzument, také v Pythonu.
+
+Pythonové aplikace používají knihovnu pika, která umí komunikovat s RabbitMQ. Port 5672 slouží pro komunikaci aplikací pomocí protokolu AMQP. Port 15672 slouží pro webové administrační rozhraní RabbitMQ, pokud je zapnutý management plugin.
+
+Docker Compose umožňuje všechny části spustit společně. Perzistentní volume uchovává data RabbitMQ mimo život jednoho kontejneru.
+
+**Pozor:** Docker ani Python nejsou principem fronty. Jsou to pouze technologie použité v této konkrétní implementaci.
+
+---
+
+## Snímek 7 – Co dělá producent
+
+### Text na snímku
+
+```python
+channel.queue_declare(
+    queue="hello_queue",
+    durable=True
+)
+
+channel.basic_publish(
+    exchange="",
+    routing_key="hello_queue",
+    body=message_body,
+    properties=pika.BasicProperties(
+        delivery_mode=2
+    )
+)
 ```
 
-### B. Code-First (Přístup bez `.proto` souborů)
+- `durable=True` – definice fronty přežije restart brokeru.
+- `delivery_mode=2` – zpráva je označena jako perzistentní.
+- `routing_key="hello_queue"` – určuje cílovou frontu při použití výchozího exchange.
 
-Tento přístup vyhovuje zejména týmům přecházejícím z **WCF** a firmám, které vyvíjejí čistě v rámci .NET platformy. Služby a kontrakty se navrhují výhradně pomocí C# rozhraní a datových tříd. Kontrakty lze následně mezi klientskými a serverovými projekty sdílet extrémně pohodlně formou vnitrofiremních **NuGet balíčků**, což celý vývoj výrazně zjednodušuje.
+Producent nejprve deklaruje frontu s názvem hello_queue. Parametr durable nastavený na true říká, že definice této fronty má přežít restart RabbitMQ.
 
----
+Potom producent publikuje zprávu. V jednoduchém příkladu používá výchozí exchange, proto je routing key přímo názvem cílové fronty. Delivery mode 2 označuje zprávu jako perzistentní, takže ji RabbitMQ ukládá odolněji vůči restartu.
 
-## Reflection a nástroje pro vývoj
+Durable fronta a perzistentní zpráva nejsou stejná věc. Durable se týká existence fronty. Persistent se týká konkrétní zprávy. V produkčním systému se pro potvrzení, že broker zprávu skutečně převzal, používají také publisher confirms.
 
-Pro účely testování a automatického objevování endpointů (Discovery Service) disponuje gRPC mechanismem **gRPC Reflection**.
-
-* **Podobnost se Swaggerem:** Reflection funguje velmi podobně jako Swashbuckle Swagger u REST API. Dokáže za běhu aplikace zpětně analyzovat endpointy i kontrakty a vystavit je okolnímu světu.
-* **Univerzálnost:** Tento mechanismus funguje jak v režimu s `.proto` soubory, tak v případě přístupu Code-First.
-
-Díky Reflection lze gRPC služby snadno testovat, zkoumat z příkazové řádky (**CLI**) nebo pomocí moderních grafických nástrojů (např. *Postman*, *Insomnia* nebo *gRPCUI*), a to včetně komplexního testování asynchronních streamů přímo na lokálním počítači.
+**Jednoduchá pomůcka:** Durable je trvalá poštovní schránka. Persistent je dopis uložený tak, aby lépe přežil restart. Publisher confirm je potvrzení pošty, že dopis přijala.
 
 ---
 
-## Web a gRPC: Propojení s klientským UI
+## Snímek 8 – Co dělá konzument
 
-Původně bylo gRPC určeno výhradně pro komunikaci typu *backend-to-backend* (tzv. East-West traffic). Dnes už to však neplatí a gRPC proniká i do scénářů *klient-server*.
 
-Standardní webové prohlížeče sice neumí kvůli omezením v API přirozeně manipulovat s HTTP/2 rámci, tento problém je však vyřešen pomocí **gRPC-Web proxy**. Sám Microsoft je autorem proxy implementované přímo v podobě **nativního middlewaru** v .NETu, která zajišťuje zpětnou kompatibilitu pro **HTTP/1.1**.
+```python
+channel.basic_qos(prefetch_count=1)
 
-### Výhody pro Blazor WebAssembly
+channel.basic_consume(
+    queue="hello_queue",
+    on_message_callback=callback,
+    auto_ack=False
+)
 
-Tuto integraci ocení zejména vývojáři stavějící **Blazor WebAssembly** aplikace. Klientské UI v prohlížeči nemusí komunikovat přes klasické REST rozhraní, ale komunikuje přímo s procedurálně orientovanou gRPC službou. Výsledkem je:
+def callback(ch, method, props, body):
+    process(body)
+    ch.basic_ack(
+        delivery_tag=method.delivery_tag
+    )
+```
 
-1. Drastické zrychlení komunikace mezi UI a backendem.
-2. Možnost provádět vysoce efektivní dávkové operace v reálném čase.
-3. Sdílení datových modelů a typová bezpečnost napříč celou aplikací (od databáze až po prohlížeč).
+- `auto_ack=False` – zpráva se nepotvrdí automaticky při doručení.
+- `basic_ack(...)` – konzument zprávu potvrdí až po dokončení práce.
+- `prefetch_count=1` – konzument dostane nejvýše jednu nepotvrzenou zprávu.
+
+Konzument má automatické potvrzení vypnuté. To je důležité, protože samotné převzetí zprávy ještě neznamená, že práce byla dokončena.
+
+Konzument nejprve zavolá funkci process a provede požadovanou práci. Až potom odešle basic_ack. Pokud by spadl před odesláním ACK, RabbitMQ ví, že zpráva nebyla potvrzena.
+
+Prefetch jedna znamená, že konzument nedostane další nepotvrzenou zprávu, dokud nedokončí první. Když běží více konzumentů, práce se díky tomu rozděluje férověji.
+
+**Přirovnání:** Kuchař dostane jeden objednávkový lístek. Dokud neřekne „hotovo“, vedoucí mu nedá další.
 
 ---
 
-## Nevýhody a omezení gRPC
+## Snímek 9 – Co se stane při pádu
 
-I přes špičkové vlastnosti má gRPC specifická úskalí:
+| Konzument spadne před ACK | Konzument odešle ACK |
+|---|---|
+| Zpráva zůstane nepotvrzená. | Broker považuje zprávu za dokončenou. |
+| Broker ji může vrátit do fronty. | Zpráva se odstraní z fronty. |
+| Zpráva může být doručena znovu. | Znovu se běžně nedoručuje. |
 
-* **Lidská nečitelnost:** Surová binární data proudící po síti nelze bez speciálních nástrojů (např. *gRPCurl*) číst v síťové záložce prohlížeče, což ztěžuje rychlý debugging.
-* **Režie se správou kontraktů:** Každá strukturální změna v rozhraní vyžaduje distribuci nových kontraktů (přegenerování kódu nebo aktualizaci NuGet balíčku) a striktní dodržování pravidel zpětné kompatibility.
-* **Nevhodné pro veřejná API:** Pro otevřená API určená široké veřejnosti nebo třetím stranám zůstává kvůli snadné integraci a univerzálnosti standardem REST API (JSON).
+**Důsledek:** Konzument musí být idempotentní.
 
-https://www.postman.com/devrel/grpc-vs-rest/grpc-request/67ebfe40f0b1294ed3714b31?sideView=agentMode
+Když konzument spadne před odesláním ACK, broker považuje úkol za nedokončený. Po ztrátě spojení může zprávu vrátit do fronty a doručit ji stejnému nebo jinému konzumentovi.
+
+To znamená, že jedna zpráva může být zpracována vícekrát. Proto musí být konzument idempotentní. Idempotence znamená, že opakované zpracování stejné zprávy nevytvoří nežádoucí dvojí výsledek.
+
+Příkladem je platba s identifikátorem PAY-55. Konzument platbu provede, ale spadne těsně před ACK. Zpráva přijde znovu. Konzument musí podle identifikátoru poznat, že platba PAY-55 už proběhla, a nesmí peníze strhnout podruhé.
+
+**Zapamatuj si:** RabbitMQ běžně pomáhá zajistit doručení alespoň jednou. Duplicitní doručení je proto možné.
+
+---
+
+## Snímek 10 – Kdy RabbitMQ použít a kdy ne
+
+| RabbitMQ se hodí | Je vhodné zvážit jiný přístup |
+|---|---|
+| Odesílání e-mailů a notifikací | Uživatel potřebuje okamžitou odpověď |
+| Zpracování obrázků a dokumentů | Jednoduchá malá aplikace |
+| Integrace mikroslužeb | Dlouhodobý event log a opakované čtení ve velkém |
+| Vyrovnání krátkodobých špiček | Není vyřešen monitoring, retry a idempotence |
+| Rozdělení práce mezi více workerů | Broker by přinesl více složitosti než užitku |
+
+RabbitMQ je vhodný hlavně pro úlohy, které mohou proběhnout asynchronně. Typickým příkladem je odesílání e-mailů, generování dokumentů, zpracování obrázků nebo rozdělení práce mezi více pracovníků.
+
+Není ale automaticky nejlepší pro každou komunikaci. Pokud uživatel potřebuje okamžitou odpověď, může být jednodušší přímé synchronní REST API. Pro dlouhodobé uchovávání proudu událostí a jejich opakované čtení se často zvažuje například Kafka.
+
+Fronta přidává odolnost, ale také další složitost. Je potřeba provozovat broker, sledovat velikost front, nastavit retry pravidla a řešit duplicitní zprávy.
+
+**Hlavní myšlenka:** RabbitMQ použijeme tehdy, když je pro nás užitečné oddělit vznik úkolu od jeho pozdějšího zpracování.
+
+---
+
+## Snímek 11 – Závěr
+
+> **Fronta nekouzlí. Dává systému čas.**
+
+### Tři hlavní přínosy
+
+1. **Oddělení** – producent nemusí čekat na konzumenta.
+2. **Odolnost** – nepotvrzený úkol lze doručit znovu.
+3. **Škálování** – více konzumentů si může rozdělit práci.
+
+**Kontrolní otázka:** Co se stane se zprávou, když konzument spadne před ACK?
+
+Na závěr zopakuji tři hlavní přínosy. Fronta odděluje služby, takže producent nemusí čekat na konzumenta. Pomáhá s odolností, protože nepotvrzenou zprávu lze doručit znovu. A umožňuje škálování, protože více konzumentů si může rozdělit práci z jedné fronty.
+
+RabbitMQ ale samo o sobě nezaručuje, že se všechno provede přesně jednou. Musíme správně používat potvrzení, perzistenci, retry a idempotenci.
+
+Pokud konzument spadne před ACK, zpráva zůstane nepotvrzená a RabbitMQ ji může doručit znovu. To je nejdůležitější odpověď celé prezentace.
+
+
+# Zdroje
+
+- Kurzový repozitář: <https://github.com/TomasRacil/analyza-IS-NoSQL>
+- RabbitMQ Work Queues: <https://www.rabbitmq.com/tutorials/tutorial-two-python>
+- RabbitMQ Consumer Acknowledgements: <https://www.rabbitmq.com/docs/confirms>
+- RabbitMQ Consumer Prefetch: <https://www.rabbitmq.com/docs/consumer-prefetch>
