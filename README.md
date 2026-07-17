@@ -181,7 +181,7 @@ Prefetch jedna znamená, že konzument nedostane další nepotvrzenou zprávu, d
 | Broker ji může vrátit do fronty. | Zpráva se odstraní z fronty. |
 | Zpráva může být doručena znovu. | Znovu se běžně nedoručuje. |
 
-**Důsledek:** Konzument musí být idempotentní.
+**Důsledek:** Konzument musí být idempotentní , neboli musí být opakovatelný se stejným výsledkem.
 
 Když konzument spadne před odesláním ACK, broker považuje úkol za nedokončený. Po ztrátě spojení může zprávu vrátit do fronty a doručit ji stejnému nebo jinému konzumentovi.
 
