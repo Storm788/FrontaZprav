@@ -1,12 +1,9 @@
 # Fronty zpráv s RabbitMQ
 
 **Předmět:** Analýza IS – NoSQL / Big Data  
-**Délka:** přibližně 10–12 minut  
 **Autor:** Kryštof Pavlů, Daniel Borovička 
 
 ---
-
-## Snímek 1 – Fronty zpráv s RabbitMQ
 
 **Fronty zpráv s RabbitMQ**
 
@@ -23,7 +20,7 @@ Příkladem může být e-shop. Po vytvoření objednávky je potřeba poslat e-
 
 ---
 
-## Snímek 2 – Jeden pomalý krok může zablokovat celou objednávku
+## Jeden pomalý krok může zablokovat celou objednávku
 
 **Synchronní řetězec:**
 
@@ -45,7 +42,7 @@ Když je například e-mailová služba pomalá, čeká kvůli ní celý požada
 
 ---
 
-## Snímek 3 – Fronta umožní bezpečně předat úkol
+## Fronta umožní bezpečně předat úkol
 
 | Bez fronty | S frontou |
 |---|---|
@@ -67,7 +64,7 @@ Fronta pomáhá také při krátkodobé špičce. Když přijde tisíc objednáv
 
 ---
 
-## Snímek 4 – Jak zpráva prochází RabbitMQ
+## Jak zpráva prochází RabbitMQ
 
 
 `PRODUCENT → EXCHANGE → FRONTA → KONZUMENT → ACK`
@@ -91,7 +88,7 @@ Konzument je pracovník nebo aplikace, která zprávu vezme a provede požadovan
 
 ---
 
-## Snímek 5 – Jedna objednávka může spustit více úloh
+## Jedna objednávka může spustit více úloh
 
 **Událost: objednávka byla vytvořena**
 
@@ -111,7 +108,7 @@ Tomuto způsobu distribuce se říká publish/subscribe. Jeden producent publiku
 
 ---
 
-## Snímek 6 – Minimální architektura
+## Minimální architektura
 
 `Python producer → RabbitMQ broker → Python consumer`
 
@@ -131,9 +128,7 @@ Docker Compose umožňuje všechny části spustit společně. Perzistentní vol
 
 ---
 
-## Snímek 7 – Co dělá producent
-
-### Text na snímku
+## Co dělá producent
 
 ```python
 channel.queue_declare(
@@ -165,7 +160,7 @@ Durable fronta a perzistentní zpráva nejsou stejná věc. Durable se týká ex
 
 ---
 
-## Snímek 8 – Co dělá konzument
+## Co dělá konzument
 
 
 ```python
@@ -198,7 +193,7 @@ Prefetch jedna znamená, že konzument nedostane další nepotvrzenou zprávu, d
 
 ---
 
-## Snímek 9 – Co se stane při pádu
+## Co se stane při pádu
 
 | Konzument spadne před ACK | Konzument odešle ACK |
 |---|---|
@@ -218,7 +213,7 @@ Příkladem je platba s identifikátorem PAY-55. Konzument platbu provede, ale s
 
 ---
 
-## Snímek 10 – Kdy RabbitMQ použít a kdy ne
+## Kdy RabbitMQ použít a kdy ne
 
 | RabbitMQ se hodí | Je vhodné zvážit jiný přístup |
 |---|---|
@@ -238,7 +233,7 @@ Fronta přidává odolnost, ale také další složitost. Je potřeba provozovat
 
 ---
 
-## Snímek 11 – Závěr
+## Závěr
 
 > **Fronta nekouzlí. Dává systému čas.**
 
