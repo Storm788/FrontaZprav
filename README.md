@@ -5,7 +5,7 @@
 
 ---
 
-**Fronty zpráv s RabbitMQ**
+**Fronty zpráv**
 
 Jak oddělit služby, zvládnout špičky a neztratit rozpracovanou úlohu
 
@@ -16,7 +16,7 @@ Dnes budu mluvit o frontách zpráv a systému RabbitMQ. Hlavní princip je jedn
 
 Příkladem může být e-shop. Po vytvoření objednávky je potřeba poslat e-mail, rezervovat zboží nebo zapsat údaje do analytiky. Tyto činnosti nemusí proběhnout všechny ve stejné sekundě.
 
-**Zapamatuj si:** RabbitMQ je prostředník mezi aplikací, která úkol vytvoří, a aplikací, která ho zpracuje.
+**More u know:** RabbitMQ je prostředník mezi aplikací, která úkol vytvoří, a aplikací, která ho zpracuje.
 
 ---
 
