@@ -108,26 +108,6 @@ Tomuto způsobu distribuce se říká publish/subscribe. Jeden producent publiku
 
 ---
 
-## Minimální architektura
-
-`Python producer → RabbitMQ broker → Python consumer`
-
-- **Producer:** Python a knihovna `pika`; publikuje zprávu.
-- **RabbitMQ:** broker; port `5672` pro AMQP a `15672` pro administrační rozhraní.
-- **Consumer:** Python a knihovna `pika`; zprávu zpracuje a potvrdí.
-- Vše může spouštět Docker Compose na společné síti.
-- RabbitMQ může používat perzistentní volume.
-
-Nejjednodušší praktická architektura má tři části. První je producent napsaný v Pythonu. Ten vytváří zprávy. Uprostřed běží RabbitMQ a na druhé straně je konzument, také v Pythonu.
-
-Pythonové aplikace používají knihovnu pika, která umí komunikovat s RabbitMQ. Port 5672 slouží pro komunikaci aplikací pomocí protokolu AMQP. Port 15672 slouží pro webové administrační rozhraní RabbitMQ, pokud je zapnutý management plugin.
-
-Docker Compose umožňuje všechny části spustit společně. Perzistentní volume uchovává data RabbitMQ mimo život jednoho kontejneru.
-
-**Pozor:** Docker ani Python nejsou principem fronty. Jsou to pouze technologie použité v této konkrétní implementaci.
-
----
-
 ## Co dělá producent
 
 ```python
